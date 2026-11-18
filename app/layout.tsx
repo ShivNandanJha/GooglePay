@@ -5,10 +5,10 @@ export const metadata: Metadata = {
   title: 'Pay',
   description: 'UPI QR payments interface — personal project, not affiliated with Google.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/logo.svg', apple: '/apple-touch-icon.png' },
+  icons: { icon: '/logo.svg', apple: '/logo.svg' },
   appleWebApp: { capable: true, title: 'Pay', statusBarStyle: 'default' },
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#dff3fb' };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#ffffff' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
