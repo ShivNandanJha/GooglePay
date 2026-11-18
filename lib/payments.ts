@@ -23,9 +23,10 @@ export function parseUPI(input: string): Recipient {
   return { upi, name: name || upi.split('@')[0], amount, note, merchantCode };
 }
 export function createTransaction(recipient: Recipient, amount: string, bank: string): Transaction {
-  return { ...recipient, amount: parseAmount(amount), id: `DEMO-TXN-${crypto.randomUUID()}`, reference: `DEMO-REF-${crypto.randomUUID().slice(0,18).toUpperCase()}`, createdAt: new Date().toISOString(), status: 'simulated', bank };
+  return { ...recipient, amount: parseAmount(amount), id: `PRJ-${crypto.randomUUID().replaceAll('-','').slice(0,16).toUpperCase()}`, reference: `PRJ-REF-${crypto.randomUUID().slice(0,8).toUpperCase()}`, createdAt: new Date().toISOString(), status: 'simulated', bank };
 }
-export function receiptText(t: Transaction) { return `DEMO PAYMENT — NO MONEY TRANSFERRED\n₹${t.amount} to ${t.name}\nUPI ID: ${t.upi}\nDate: ${new Date(t.createdAt).toLocaleString('en-IN')}\nDemo reference: ${t.reference}\nDemo transaction ID: ${t.id}\nThis is a simulation, not proof of payment.`; }
+export const DISCLAIMER = 'Personal design project — not Google Pay and not affiliated with Google. No real money is transferred; receipts are not proof of payment.';
+export function receiptText(t: Transaction) { return `₹${t.amount} to ${t.name}\nUPI ID: ${t.upi}\nDate: ${new Date(t.createdAt).toLocaleString('en-IN')}\nReference: ${t.reference}\nTransaction ID: ${t.id}\n\n${DISCLAIMER}`; }
 export function readTransactions(): Transaction[] {
   try { const data: unknown = JSON.parse(localStorage.getItem('pay-demo-history') || '[]'); return Array.isArray(data) ? data.filter((t): t is Transaction => t && t.status === 'simulated' && typeof t.id === 'string' && typeof t.upi === 'string' && typeof t.name === 'string' && typeof t.amount === 'string' && Number(t.amount) > 0 && typeof t.createdAt === 'string' && !isNaN(Date.parse(t.createdAt)) && typeof t.reference === 'string' && typeof t.bank === 'string').slice(0,100) : []; } catch { return []; }
 }
