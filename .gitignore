@@ -1,0 +1,7 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+design/*
+!design/REHEARSAL.md
+!design/asset-nodes.json
