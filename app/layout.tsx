@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: 'Pay',
   description: 'UPI QR payments interface — personal project, not affiliated with Google.',
   manifest: '/manifest.webmanifest',
+  icons: { icon: '/logo.svg', apple: '/apple-touch-icon.png' },
   appleWebApp: { capable: true, title: 'Pay', statusBarStyle: 'default' },
 };
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#dff3fb' };

@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import QRCode from 'qrcode';
 import {
   ArrowLeft, ArrowRight, BadgeCheck, Camera, Check, CheckCircle2, ChevronDown, ChevronRight, CircleDollarSign, CreditCard,
   Download, Gauge, Gift, Globe, HandCoins, HeartHandshake, HelpCircle, History, Home, Landmark, Lightbulb, MoreVertical,
   Moon, Pencil, QrCode, Radio, RefreshCw, Rocket, ScanLine, Search, Send, Settings, Share2, ShieldCheck, Smartphone, Sun,
-  Trophy, Tv, UserCircle2, Users, Wallet, X, Zap, BellRing,
+  Trophy, Tv, UserCircle2, Users, Wallet, X, Zap, BellRing, Copy, Lock, CircleHelp,
 } from 'lucide-react';
 import { Swap } from './stageshow/motion/Swap';
 import { createTransaction, DISCLAIMER, parseAmount, parseUPI, readTransactions, receiptText, type Recipient, type Transaction } from '@/lib/payments';
@@ -13,7 +14,7 @@ import { defaultProfile, imageToAvatar, readProfile, saveProfile, type Profile }
 
 const Scanner = dynamic(() => import('./Scanner'), { ssr: false });
 
-type View = 'home' | 'money' | 'you' | 'scan' | 'search' | 'pay' | 'success' | 'history' | 'receipt';
+type View = 'home' | 'money' | 'you' | 'scan' | 'search' | 'pay' | 'transferring' | 'success' | 'history' | 'receipt' | 'qr';
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
 const people = ['Anil', 'Archana', 'Abhinandan', 'Rimi', 'Rajib', 'Milan Das', 'Shubham K'];
@@ -56,6 +57,8 @@ export default function PayApp() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Profile>(defaultProfile);
   const [detailsOpen, setDetailsOpen] = useState(true);
+  const [qrSrc, setQrSrc] = useState('');
+  const [splash, setSplash] = useState(true);
 
   const lock = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,20 +70,28 @@ export default function PayApp() {
 
   useEffect(() => {
     setHistory(readTransactions());
+    const seen = sessionStorage.getItem('pay-splash');
+    const hide = setTimeout(() => setSplash(false), seen ? 0 : 1600);
+    try { sessionStorage.setItem('pay-splash', '1'); } catch {}
     setProfile(readProfile());
     try { setDark(localStorage.getItem('pay-theme') === 'dark'); } catch {}
     const listener = (e: Event) => { e.preventDefault(); setInstall(e as InstallPrompt); };
     window.addEventListener('beforeinstallprompt', listener);
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') navigator.serviceWorker.register('/sw.js').catch(() => {});
-    return () => { window.removeEventListener('beforeinstallprompt', listener); if (timer.current) clearTimeout(timer.current); };
+    return () => { clearTimeout(hide); window.removeEventListener('beforeinstallprompt', listener); if (timer.current) clearTimeout(timer.current); };
   }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3000); return () => clearTimeout(t); }, [toast]);
   useEffect(() => { if (info) infoDialog.current?.showModal(); else infoDialog.current?.close(); }, [info]);
   useEffect(() => { if (sheet) bankDialog.current?.showModal(); else bankDialog.current?.close(); }, [sheet]);
   useEffect(() => { if (editing) editDialog.current?.showModal(); else editDialog.current?.close(); }, [editing]);
   useEffect(() => { main.current?.scrollTo(0, 0); setError(''); }, [view]);
+  useEffect(() => {
+    if (view !== 'qr') return;
+    const link = `upi://pay?pa=${encodeURIComponent(profile.upi)}&pn=${encodeURIComponent(profile.name)}&cu=INR`;
+    QRCode.toDataURL(link, { margin: 1, width: 480, errorCorrectionLevel: 'M' }).then(setQrSrc).catch(() => setQrSrc(''));
+  }, [view, profile]);
 
-  function go(v: View) { if (busy) return; setView(v); setSheet(false); }
+  function go(v: View) { if (busy && v !== 'transferring') return; setView(v); setSheet(false); }
   function receive(r: Recipient) { setRecipient(r); setAmount(r.amount || ''); setNote(r.note || ''); setView('pay'); }
   function submitRecipient(e: React.FormEvent) { e.preventDefault(); try { receive(parseUPI(query)); } catch (err) { setError((err as Error).message); } }
   function review(e: React.FormEvent) { e.preventDefault(); try { parseAmount(amount); setError(''); setSheet(true); } catch (err) { setError((err as Error).message); } }
@@ -88,15 +99,15 @@ export default function PayApp() {
 
   function pay() {
     if (lock.current || !recipient) return;
-    lock.current = true; setBusy(true);
+    lock.current = true; setBusy(true); setSheet(false); setView('transferring');
     const r = { ...recipient, note };
     timer.current = setTimeout(() => {
       const t = createTransaction(r, amount, bank);
       const next = [t, ...readTransactions()].slice(0, 100);
       setHistory(next);
       try { localStorage.setItem('pay-demo-history', JSON.stringify(next)); } catch { setToast('History could not be saved on this device.'); }
-      setTransaction(t); setSheet(false); setBusy(false); lock.current = false; setDetailsOpen(true); setView('success');
-    }, 1200);
+      setTransaction(t); setBusy(false); lock.current = false; setDetailsOpen(true); setView('success');
+    }, 2000);
   }
 
   async function share() {
@@ -107,6 +118,21 @@ export default function PayApp() {
       else { await navigator.clipboard.writeText(text); setToast('Details copied'); }
     } catch (e) { if ((e as Error).name !== 'AbortError') setToast('Sharing unavailable'); }
   }
+
+  async function shareQr() {
+    const text = `Pay ${profile.name} on UPI: ${profile.upi}`;
+    try {
+      if (qrSrc && navigator.canShare) {
+        const blob = await (await fetch(qrSrc)).blob();
+        const file = new File([blob], 'my-upi-qr.png', { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
+      }
+      if (navigator.share) await navigator.share({ text });
+      else { await navigator.clipboard.writeText(profile.upi); setToast('UPI ID copied'); }
+    } catch (e) { if ((e as Error).name !== 'AbortError') setToast('Sharing unavailable'); }
+  }
+  function downloadQr() { if (!qrSrc) return; const a = document.createElement('a'); a.href = qrSrc; a.download = 'my-upi-qr.png'; a.click(); }
+  async function copyUpi() { try { await navigator.clipboard.writeText(profile.upi); setToast('UPI ID copied'); } catch { setToast(profile.upi); } }
 
   function openEditor() { setDraft(profile); setError(''); setEditing(true); }
   async function pickPhoto(file?: File) {
@@ -156,6 +182,13 @@ export default function PayApp() {
       </aside>
 
       <div className="app-shell">
+        {splash && (
+          <div className="splash" aria-label="Loading">
+            <img src="/logo.svg" alt="" className="splash-logo" />
+            <span className="splash-word">Pay</span>
+            <small>Personal project · not affiliated with Google</small>
+          </div>
+        )}
         <main ref={main} className="app-main">
           {view === 'home' && (
             <div className="screen home">
@@ -314,7 +347,7 @@ export default function PayApp() {
                 </div>
                 {row('Edit profile', <Pencil />, openEditor, 'Change your name and photo')}
                 {row('Pay with credit or debit cards', <CreditCard />, () => service('Cards'), 'Pay bills with your card', <span className="link">Add</span>)}
-                {row('Your QR code', <QrCode />, () => setInfo({ title: 'Your QR code', body: `Others can pay you at ${profile.upi}.` }), 'Use to receive money from any UPI app')}
+                {row('Your QR code', <QrCode />, () => go('qr'), 'Use to receive money from any UPI app')}
                 {row('Autopay', <RefreshCw />, () => service('Autopay'), 'No pending requests')}
                 {row('Transaction history', <History />, () => go('history'))}
                 {row(dark ? 'Light theme' : 'Dark theme', dark ? <Sun /> : <Moon />, toggleTheme)}
@@ -337,8 +370,14 @@ export default function PayApp() {
                 <button className="primary" type="submit">Continue <ArrowRight size={18} /></button>
                 <button type="button" className="outline" onClick={() => go('scan')}><ScanLine size={18} /> Scan QR instead</button>
               </form>
+              {history.length > 0 && <section className="section">
+                <h2>Recent</h2>
+                {[...new Map(history.map(t => [t.upi, t])).values()].slice(0, 3).map(t => (
+                  <button className="txn-row" key={t.upi} onClick={() => receive({ name: t.name, upi: t.upi })}><Avatar name={t.name} size={40} /><span className="row-text">{t.name}<small>{t.upi}</small></span><ChevronRight size={18} /></button>
+                ))}
+              </section>}
               <section className="section">
-                <h2>People</h2>
+                <h2>All people on UPI</h2>
                 {people.map(n => (
                   <button className="txn-row" key={n} onClick={() => receive({ name: n, upi: upiFor(n) })}><Avatar name={n} size={40} /><span className="row-text">{n}<small>{upiFor(n)}</small></span><ChevronRight size={18} /></button>
                 ))}
@@ -362,12 +401,47 @@ export default function PayApp() {
             </div>
           )}
 
-          {(view === 'success' || view === 'receipt') && transaction && (
+          {view === 'transferring' && recipient && (
+            <div className="screen payment">
+              <header className="toolbar"><span className="icon-btn"><X /></span><span className="grow" /><span className="icon-btn"><MoreVertical /></span></header>
+              <div className="payment-form static">
+                <Avatar name={recipient.name} size={56} />
+                <p className="pay-to">Paying {recipient.name}</p>
+                <span className="pay-id">{recipient.upi}</span>
+                <p className="big-amt"><span>₹</span>{Number(amount).toLocaleString('en-IN')}</p>
+                {note && <span className="note-chip">{note}</span>}
+              </div>
+              <div className="transfer-bar"><span className="lock-spin"><Lock size={16} /></span>Transferring ₹{Number(amount).toLocaleString('en-IN')}</div>
+            </div>
+          )}
+
+          {view === 'success' && transaction && (
+            <div className="screen success">
+              <header className="toolbar"><button className="icon-btn" aria-label="Close" onClick={() => go('home')}><X /></button><span className="grow" /><button className="icon-btn" aria-label="Details" onClick={() => go('receipt')}><MoreVertical /></button></header>
+              <div className="success-body">
+                <div className="tick"><svg viewBox="0 0 52 52" aria-hidden><path d="M14 27l8 8 16-17" /></svg></div>
+                <h1 className="s-amt">₹ {money(transaction.amount)}</h1>
+                <p className="muted">Paid to</p>
+                <h2 className="s-name">{transaction.name}</h2>
+                <p className="s-upi">{transaction.upi}</p>
+                <p className="s-date">{date(transaction.createdAt)}</p>
+                <p className="r-note">Personal project · no money transferred</p>
+                <button className="link-btn" onClick={() => go('receipt')}>View details <ChevronRight size={16} /></button>
+              </div>
+              <div className="s-actions">
+                <button className="outline" onClick={share}><Share2 size={16} /> Share</button>
+                <button className="primary" onClick={() => go('scan')}><ScanLine size={16} /> Open scanner</button>
+              </div>
+              <Footer />
+            </div>
+          )}
+
+          {view === 'receipt' && transaction && (
             <div className="screen receipt">
-              <header className="toolbar"><button className="icon-btn" aria-label="Back" onClick={() => go('home')}><ArrowLeft /></button><span className="grow" /><button className="icon-btn" aria-label="Share" onClick={share}><Share2 /></button></header>
+              <header className="toolbar"><button className="icon-btn" aria-label="Back" onClick={() => go('home')}><ArrowLeft /></button><span className="grow" /><button className="icon-btn" aria-label="Share" onClick={share}><Share2 /></button><button className="icon-btn" aria-label="More" onClick={() => go('history')}><MoreVertical /></button></header>
               <div className="receipt-head">
-                <Avatar name={transaction.name} size={72} />
-                <p className="r-to">To {transaction.name.toUpperCase()}</p>
+                <Avatar name={transaction.name} size={64} />
+                <p className="r-to">To {transaction.name}</p>
                 <h1 className="r-amt"><span>₹</span>{money(transaction.amount)}</h1>
                 <span className="r-chip">UPI</span>
                 <p className="r-status"><CheckCircle2 size={20} /> Completed</p>
@@ -377,21 +451,44 @@ export default function PayApp() {
               </div>
               <div className="r-card">
                 <button className="r-bank" onClick={() => setDetailsOpen(o => !o)} aria-expanded={detailsOpen}>
-                  <span className="bank-icon"><Landmark size={20} /></span><span className="grow">{transaction.bank.replace('••••', '')}</span>
+                  <span className="bank-icon"><Landmark size={20} /></span><span className="grow">{transaction.bank}</span>
                   <ChevronDown className={detailsOpen ? 'flip' : ''} />
                 </button>
                 {detailsOpen && <>
+                  <div className="timeline">
+                    <p><i className="dot" /> Payment started</p>
+                    <p className="done"><CheckCircle2 size={18} /> Payment completed</p>
+                  </div>
                   <div className="r-alert"><BellRing size={22} /><div><b>Payment of ₹{money(transaction.amount)} completed</b><p>Not a real transfer. This record is from a personal project and is not proof of payment.</p></div></div>
                   <dl>
                     <dt>Transaction ID</dt><dd>{transaction.id}</dd>
                     <dt>To: {transaction.name}</dt><dd>{transaction.upi}</dd>
-                    <dt>From: {profile.name}</dt><dd>{profile.upi}</dd>
+                    <dt>From: {profile.name} ({transaction.bank})</dt><dd>{profile.upi}</dd>
                     {transaction.note && <><dt>Note</dt><dd>{transaction.note}</dd></>}
                     <dt>Reference</dt><dd>{transaction.reference}</dd>
                   </dl>
                 </>}
               </div>
-              <div className="r-actions"><button className="outline" onClick={share}><Share2 size={16} /> Share</button><button className="primary" onClick={() => go('home')}>Done</button></div>
+              <p className="r-foot">Payments may take up to 3 working days to be reflected in your account</p>
+              <div className="issues"><button className="outline small" onClick={() => setInfo({ title: 'Having issues?', body: 'This app does not move real money, so there is nothing to dispute. Check the amount and UPI ID shown above.' })}><CircleHelp size={16} /> Having issues?</button></div>
+              <Footer />
+            </div>
+          )}
+
+          {view === 'qr' && (
+            <div className="screen">
+              <header className="toolbar"><button className="icon-btn" aria-label="Back" onClick={() => go('you')}><ArrowLeft /></button><span className="grow" /><button className="icon-btn" aria-label="Download QR" onClick={downloadQr}><Download /></button><button className="icon-btn" aria-label="More" onClick={openEditor}><MoreVertical /></button></header>
+              <div className="qr-card">
+                <div className="qr-name"><Avatar name={profile.name} photo={profile.photo} size={36} /><span>{profile.name}</span></div>
+                <div className="qr-img">{qrSrc ? <img src={qrSrc} alt={`UPI QR code for ${profile.upi}`} /> : <QrCode size={64} />}</div>
+                <p className="muted">Scan to pay with any UPI app</p>
+                <button className="qr-bank" onClick={() => service('Change account')}><Landmark size={18} /> {banks[0]} <ChevronRight size={16} /></button>
+                <button className="qr-upi" onClick={copyUpi}>UPI ID: {profile.upi} <Copy size={16} /></button>
+              </div>
+              <div className="s-actions">
+                <button className="outline" onClick={() => go('scan')}><ScanLine size={16} /> Open scanner</button>
+                <button className="primary" onClick={shareQr}><Share2 size={16} /> Share QR code</button>
+              </div>
               <Footer />
             </div>
           )}

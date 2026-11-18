@@ -249,3 +249,44 @@ h1 { font-weight: 400; } h2 { font-size: 22px; font-weight: 400; } h3 { font-siz
 @media (max-width: 520px) { .sheet { margin: auto 0 0; width: 100%; max-width: 100%; border-radius: 28px 28px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); } .bottom-nav { height: calc(80px + env(safe-area-inset-bottom)); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .avatar.outline svg { width: 26px; height: 26px; }
+
+/* transferring / success / qr */
+.payment-form.static { padding-top: 90px; }
+.big-amt { font-size: 52px; margin: 24px 0 12px; display: flex; align-items: flex-start; gap: 6px; }
+.big-amt span { font-size: 34px; margin-top: 8px; }
+.note-chip { background: var(--soft); border-radius: 10px; padding: 6px 12px; font-size: 13px; }
+.transfer-bar { margin-top: auto; display: flex; align-items: center; gap: 14px; padding: 26px 22px; border-top: 1px solid var(--line); border-radius: 24px 24px 0 0; font-size: 17px; box-shadow: 0 -2px 10px #0000000d; }
+.lock-spin { position: relative; width: 30px; height: 30px; display: grid; place-items: center; color: var(--blue); }
+.lock-spin::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2.5px solid var(--tile); border-top-color: var(--blue); animation: spin 900ms linear infinite; }
+.success-body { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 70px 24px 10px; }
+.tick { width: 112px; height: 112px; border-radius: 50%; background: #0b57d0; display: grid; place-items: center; animation: pop 520ms var(--settle); }
+.tick svg { width: 60px; height: 60px; fill: none; stroke: #fff; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw 420ms 260ms ease-out forwards; }
+@keyframes pop { 0% { transform: scale(.3); opacity: 0; } 70% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.s-amt { font-size: 44px; margin: 48px 0 26px; }
+.s-name { font-size: 28px; margin: 4px 0 6px; overflow-wrap: anywhere; }
+.s-upi { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.s-date { font-size: 14px; margin-top: 10px; }
+.success .r-note { margin: 6px 0 10px; }
+.s-actions { display: flex; justify-content: center; gap: 10px; padding: 26px 18px 0; }
+.timeline { padding: 18px 18px 6px; position: relative; }
+.timeline p { display: flex; align-items: center; gap: 18px; font-size: 16px; padding-bottom: 22px; position: relative; }
+.timeline .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--blue); margin: 0 3px; }
+.timeline p:first-child::after { content: ''; position: absolute; left: 8px; top: 20px; height: 28px; border-left: 2px solid var(--line); }
+.timeline .done { color: #188038; padding-bottom: 14px; }
+.timeline .done svg { color: #fff; fill: #188038; }
+.r-foot { text-align: center; font-size: 13px; color: var(--muted); padding: 18px 40px 0; line-height: 1.5; }
+.issues { padding: 16px 18px 0; }
+.outline.small { min-height: 40px; padding: 8px 16px; color: var(--ink); }
+.outline.small svg { color: var(--blue); }
+.qr-card { margin: 4px 18px 0; background: var(--soft); border-radius: 28px; padding: 28px 20px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.qr-name { display: flex; align-items: center; gap: 10px; font-size: 24px; }
+.qr-img { width: 240px; height: 240px; background: #fff; border-radius: 16px; padding: 10px; display: grid; place-items: center; color: #999; }
+.qr-img img { width: 100%; height: 100%; image-rendering: pixelated; }
+.qr-bank, .qr-upi { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.qr-bank svg:first-child, .qr-upi svg { color: var(--blue); }
+.splash { position: absolute; inset: 0; z-index: 20; background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center; animation: splash-out 300ms 1300ms forwards; }
+.splash-logo { width: 96px; height: 96px; animation: pop 600ms var(--settle); }
+.splash-word { font-size: 28px; margin-top: 18px; color: var(--ink); animation: in 500ms 200ms both; }
+.splash small { position: absolute; bottom: 36px; font-size: 12px; color: var(--muted); }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
